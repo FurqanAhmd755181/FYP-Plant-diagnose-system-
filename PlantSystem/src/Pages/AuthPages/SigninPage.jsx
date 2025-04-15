@@ -23,7 +23,7 @@ const SignInScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://<your-ip>:5000/signin', {
+      const response = await fetch('http://192.168.100.22:5000/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

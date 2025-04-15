@@ -29,20 +29,26 @@ const SignUpScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:5000/register', {
+      const response = await fetch('http://192.168.100.22:5000/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
       const result = await response.json();
-      if (result.success) {
+      console.log('Server response:', result); // optional for debugging
+
+      if (response.status === 201) {
         Alert.alert('Success', result.message);
         navigation.navigate('SignIn');
+      } else if (response.status === 400 && result.errors) {
+        const firstError = Object.values(result.errors)[0][0];
+        Alert.alert('Validation Error', firstError);
       } else {
-        Alert.alert('Error', result.message);
+        Alert.alert('Error', result.message || 'Something went wrong.');
       }
     } catch (error) {
+      console.error('Network error:', error);
       Alert.alert('Error', 'Network error.');
     } finally {
       setIsLoading(false);
