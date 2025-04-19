@@ -9,14 +9,16 @@ from marshmallow import fields
 from marshmallow import ValidationError
 from flask_jwt_extended import get_jwt, jwt_required, get_jwt_identity
 from project.app.db import db
+from flask_cors import cross_origin
 
 bp = Blueprint("user", __name__)
 
 @bp.route("/register", methods=["POST"])
+@cross_origin(origins='http://localhost:8081')
 @use_args(UserSchema(), location="json")
 def register_user(args):
     try:
-        breakpoint()
+        # breakpoint()
         res = UserBLC.add_user(args)
         return jsonify({"message": "User added successfully", "result": res}), 201
     except ValidationError as err:

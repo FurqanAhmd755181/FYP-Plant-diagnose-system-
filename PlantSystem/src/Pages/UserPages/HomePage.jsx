@@ -12,6 +12,7 @@ import {
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { Pressable } from "react-native";
 
+
 const categories = [
   { id: "flowers", name: "Flowers", icon: "flower" },
   { id: "fruits", name: "Fruits", icon: "food-apple" },

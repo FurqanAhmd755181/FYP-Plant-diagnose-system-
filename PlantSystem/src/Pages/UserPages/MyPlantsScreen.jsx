@@ -1,7 +1,6 @@
 import React, { useContext } from "react";
 import { View, Text, Image, StyleSheet, ScrollView } from "react-native";
 import { PhotoContext } from "../../components/PhotoContext";
-
 const MyPlantsScreen = () => {
   const { photoUri } = useContext(PhotoContext);
 

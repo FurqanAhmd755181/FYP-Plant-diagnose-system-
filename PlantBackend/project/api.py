@@ -9,14 +9,17 @@ from project.blueprint.Model import bp as model_bp
 from project.blueprint.User import bp as user_bp
 from flask_jwt_extended import get_jwt
 from project.app.model.TokenBlockList import TokenBlockList
+from flask_cors import CORS
 
 def create_app():
     app = Flask(__name__)
+    
     app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+pymysql://root:Furqan686@localhost/plant_diagnose_system"
     app.config["JWT_SECRET_KEY"] = "7b69f55b6d91eb72206525bdc197b343f440cc63a440a0f83a81a92eae642bb4"
     app.config['JWT_EXPIRATION_DELTA'] = timedelta(days=30)
 
     db.init_app(app)
+    CORS(app)
     migrate = Migrate(app, db)
     jwt = JWTManager(app)
 
@@ -45,5 +48,7 @@ def create_app():
 
     app.register_blueprint(model_bp)
     app.register_blueprint(user_bp)
+    # with app.app_context():
+    #     db.create_all()
 
     return app

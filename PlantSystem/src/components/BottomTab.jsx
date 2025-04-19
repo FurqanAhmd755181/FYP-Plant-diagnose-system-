@@ -22,7 +22,9 @@ const Tab = createBottomTabNavigator();
 
 export default function App() {
   return (
-    <PhotoProvider> {/* Wrap the entire app with PhotoProvider */}
+    <PhotoProvider>
+      {" "}
+      {/* Wrap the entire app with PhotoProvider */}
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,

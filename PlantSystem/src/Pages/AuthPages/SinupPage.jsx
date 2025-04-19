@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,48 +8,49 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-} from 'react-native';
+} from "react-native";
 
 const SignUpScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  // const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignUp = async () => {
-    if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all the fields.');
+    if (!email || !password /*|| !confirmPassword*/) {
+      Alert.alert("Error", "Please fill in all the fields.");
       return;
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
-      return;
-    }
+    // if (password !== confirmPassword) {
+    //   Alert.alert('Error', 'Passwords do not match.');
+    //   return;
+    // }
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.100.22:5000/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const response = await fetch("http://127.0.0.1:5000/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password }),
       });
 
       const result = await response.json();
-      console.log('Server response:', result); // optional for debugging
+      console.log("Server response:", result); // optional for debugging
 
       if (response.status === 201) {
-        Alert.alert('Success', result.message);
-        navigation.navigate('SignIn');
+        Alert.alert("Success", result.message);
+        navigation.navigate("SignIn");
       } else if (response.status === 400 && result.errors) {
         const firstError = Object.values(result.errors)[0][0];
-        Alert.alert('Validation Error', firstError);
+        Alert.alert("Validation Error", firstError);
       } else {
-        Alert.alert('Error', result.message || 'Something went wrong.');
+        Alert.alert("Error", result.message || "Something went wrong.");
       }
     } catch (error) {
-      console.error('Network error:', error);
-      Alert.alert('Error', 'Network error.');
+      console.error("Network error:", error);
+      Alert.alert("Error", "Network error.");
     } finally {
       setIsLoading(false);
     }
@@ -59,6 +60,16 @@ const SignUpScreen = ({ navigation }) => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Create Account</Text>
       <Text style={styles.subtitle}>Sign up to get started</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="User Name"
+        keyboardType="username"
+        autoCapitalize="none"
+        onChangeText={setUsername}
+        value={username}
+        placeholderTextColor="#a1a1a1"
+      ></TextInput>
+
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -76,14 +87,14 @@ const SignUpScreen = ({ navigation }) => {
         value={password}
         placeholderTextColor="#a1a1a1"
       />
-      <TextInput
+      {/* <TextInput
         style={styles.input}
         placeholder="Confirm Password"
         secureTextEntry
         onChangeText={setConfirmPassword}
         value={confirmPassword}
         placeholderTextColor="#a1a1a1"
-      />
+      /> */}
       {isLoading ? (
         <ActivityIndicator size="large" color="#007BFF" />
       ) : (
@@ -93,7 +104,7 @@ const SignUpScreen = ({ navigation }) => {
       )}
       <View style={styles.loginContainer}>
         <Text style={styles.loginText}>Already have an account?</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
+        <TouchableOpacity onPress={() => navigation.navigate("SignIn")}>
           <Text style={styles.loginLink}> Sign In</Text>
         </TouchableOpacity>
       </View>
@@ -107,32 +118,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f0f4f8',
+    backgroundColor: "#f0f4f8",
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: '#555',
+    color: "#555",
     marginBottom: 30,
-    textAlign: 'center',
+    textAlign: "center",
   },
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     paddingHorizontal: 15,
     marginBottom: 20,
     fontSize: 16,
-    backgroundColor: '#fff',
-    color: '#333',
-    shadowColor: '#000',
+    backgroundColor: "#fff",
+    color: "#333",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 5,
@@ -140,35 +151,35 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 50,
-    backgroundColor: '#007BFF',
+    backgroundColor: "#007BFF",
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
-    shadowColor: '#007BFF',
+    shadowColor: "#007BFF",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.4,
     shadowRadius: 5,
     elevation: 3,
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     marginTop: 20,
   },
   loginText: {
     fontSize: 14,
-    color: '#555',
+    color: "#555",
   },
   loginLink: {
     fontSize: 14,
-    color: '#007BFF',
-    fontWeight: 'bold',
+    color: "#007BFF",
+    fontWeight: "bold",
     marginLeft: 5,
   },
 });

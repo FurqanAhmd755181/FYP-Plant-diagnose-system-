@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Platform,
   Alert,
+  Modal,
+  Image,
 } from "react-native";
 import { Camera } from "expo-camera";
 import * as FileSystem from "expo-file-system";
@@ -14,29 +16,68 @@ import { PhotoContext } from "../components/PhotoContext";
 
 const CameraComponent = () => {
   const { setPhotoUri } = useContext(PhotoContext);
-
   const [hasPermission, setHasPermission] = useState(null);
   const [cameraRef, setCameraRef] = useState(null);
   const [cameraType, setCameraType] = useState(Camera.Constants?.Type.back);
   const videoRef = useRef(null);
   const [isWebCameraOn, setIsWebCameraOn] = useState(false);
 
+  const [showModal, setShowModal] = useState(false);
+  const [predictionData, setPredictionData] = useState({ result: "", treatment: "" });
+  const [previewImage, setPreviewImage] = useState(null);
+
   useEffect(() => {
     if (Platform.OS === "web") {
       setHasPermission(true);
     } else {
       (async () => {
-        const { status: cameraStatus } =
-          await Camera.requestCameraPermissionsAsync();
-        const { status: galleryStatus } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-        setHasPermission(
-          cameraStatus === "granted" && galleryStatus === "granted"
-        );
+        const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+        const { status: galleryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        setHasPermission(cameraStatus === "granted" && galleryStatus === "granted");
       })();
     }
   }, []);
+
+  const uploadImage = async (uri) => {
+    const formData = new FormData();
+    try {
+      if (uri.startsWith("data:")) {
+        const blob = await fetch(uri).then((r) => r.blob());
+        formData.append("image", blob, "photo.jpg");
+      } else {
+        const file = {
+          uri,
+          name: "photo.jpg",
+          type: "image/jpeg",
+        };
+        formData.append("image", file);
+      }
+
+      const response = await fetch("http://127.0.0.1:5000/api/image", {
+        method: "POST",
+        body: formData,
+        headers: Platform.OS === "web" ? {} : {
+          Accept: "application/json",
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      setPredictionData({
+        result: data["plant name"] || "Unknown",
+        treatment: data["predicted_results"] || "Not provided",
+      });
+      setPreviewImage(uri);
+      setShowModal(true);
+    } catch (error) {
+      console.error("Upload error:", error);
+      Alert.alert("Upload failed", error.message || "Could not send image to server.");
+    }
+  };
 
   const pickImageFromGallery = async () => {
     try {
@@ -47,10 +88,10 @@ const CameraComponent = () => {
         quality: 1,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
+      if (!result.canceled && result.assets?.length > 0) {
         const uri = result.assets[0].uri;
-        console.log("Selected image URI:", uri);
         setPhotoUri(uri);
+        await uploadImage(uri);
       }
     } catch (error) {
       Alert.alert("Error", "Failed to pick an image from the gallery.");
@@ -58,59 +99,29 @@ const CameraComponent = () => {
     }
   };
 
-  const startWebCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoRef.current.srcObject = stream;
-      videoRef.current.play();
-      setIsWebCameraOn(true);
-    } catch (err) {
-      console.error("Error accessing the camera on web:", err);
-      setHasPermission(false);
-    }
-  };
-
-  const stopWebCamera = () => {
-    const stream = videoRef.current?.srcObject;
-    if (stream) {
-      const tracks = stream.getTracks();
-      tracks.forEach((track) => track.stop());
-    }
-    setIsWebCameraOn(false);
-  };
-
   const handleCapture = async () => {
     if (Platform.OS === "web") {
-      const canvas = document.createElement("canvas");
       const video = videoRef.current;
+      if (!video) return;
 
-      if (video) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        const dataUrl = canvas.toDataURL("image/jpeg");
-        localStorage.setItem("photoUri", dataUrl);
-        setPhotoUri(dataUrl);
-      }
+      const dataUrl = canvas.toDataURL("image/jpeg");
+      setPhotoUri(dataUrl);
+      await uploadImage(dataUrl);
     } else {
-      if (cameraRef) {
-        try {
-          const photo = await cameraRef.takePictureAsync();
-          const fileName = `${FileSystem.documentDirectory}photo_${Date.now()}.jpg`;
+      if (!cameraRef) return;
 
-          await FileSystem.moveAsync({
-            from: photo.uri,
-            to: fileName,
-          });
+      const photo = await cameraRef.takePictureAsync();
+      const fileName = `${FileSystem.documentDirectory}photo_${Date.now()}.jpg`;
 
-          setPhotoUri(fileName);
-        } catch (error) {
-          Alert.alert("Error", "Failed to capture photo.");
-          console.error(error);
-        }
-      }
+      await FileSystem.moveAsync({ from: photo.uri, to: fileName });
+      setPhotoUri(fileName);
+      await uploadImage(fileName);
     }
   };
 
@@ -124,41 +135,82 @@ const CameraComponent = () => {
     }
   };
 
-  if (hasPermission === null) {
-    return <View />;
-  }
+  const startWebCamera = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    videoRef.current.srcObject = stream;
+    setIsWebCameraOn(true);
+  };
 
-  if (hasPermission === false) {
+  const stopWebCamera = () => {
+    const stream = videoRef.current?.srcObject;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+    setIsWebCameraOn(false);
+  };
+
+  if (hasPermission === null) return <View />;
+  if (hasPermission === false)
     return (
       <View style={styles.center}>
         <Text>No access to camera or gallery</Text>
       </View>
     );
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: "black" }}>
+      {/* Modal for Prediction Result */}
+      <Modal visible={showModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>🧬 Prediction Result</Text>
+            {previewImage && (
+              <Image
+                source={{ uri: previewImage }}
+                style={{
+                  width: 200,
+                  height: 200,
+                  borderRadius: 16,
+                  borderWidth: 2,
+                  borderColor: "#0B5D51",
+                  marginBottom: 16,
+                }}
+              />
+            )}
+            <Text style={styles.modalText}>🌿 Disease: {predictionData.result}</Text>
+            <Text style={styles.modalText}>💊 Treatment: {predictionData.treatment}</Text>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowModal(false)}
+            >
+              <Text style={{ color: "#fff" }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Camera / Web View */}
       {Platform.OS === "web" ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <video
-            ref={videoRef}
-            style={{ width: "100%", height: "80%", backgroundColor: "black" }}
-          />
+        <View style={styles.webContainer}>
+          <video ref={videoRef} style={styles.webVideo} autoPlay playsInline />
           <View style={styles.webControls}>
-            {isWebCameraOn ? (
-              <TouchableOpacity onPress={stopWebCamera} style={styles.webButton}>
-                <Text style={styles.buttonText}>Stop</Text>
+            {!isWebCameraOn ? (
+              <TouchableOpacity onPress={startWebCamera} style={styles.webButton}>
+                <Text style={styles.buttonText}>Start Camera</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity onPress={startWebCamera} style={styles.webButton}>
-                <Text style={styles.buttonText}>Start</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity onPress={stopWebCamera} style={styles.webButton}>
+                  <Text style={styles.buttonText}>Stop Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleCapture} style={styles.captureButton} />
+              </>
             )}
-            {isWebCameraOn && (
-              <TouchableOpacity onPress={handleCapture} style={styles.captureButton} />
-            )}
-            <TouchableOpacity onPress={pickImageFromGallery} style={styles.webButton}>
-              <Text style={styles.buttonText}>Gallery</Text>
+            <TouchableOpacity
+              onPress={pickImageFromGallery}
+              style={styles.webButton}
+            >
+              <Text style={styles.buttonText}>Choose from Gallery</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -168,9 +220,7 @@ const CameraComponent = () => {
             <TouchableOpacity onPress={pickImageFromGallery} style={styles.sideButton}>
               <Text style={styles.buttonText}>📁</Text>
             </TouchableOpacity>
-
             <TouchableOpacity onPress={handleCapture} style={styles.captureButton} />
-
             <TouchableOpacity onPress={toggleCameraType} style={styles.sideButton}>
               <Text style={styles.buttonText}>🔄</Text>
             </TouchableOpacity>
@@ -189,7 +239,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingHorizontal: 20,
   },
   sideButton: {
     backgroundColor: "rgba(0,0,0,0.4)",
@@ -204,28 +253,84 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderColor: "#0B5D51",
   },
-  webControls: {
-    flexDirection: "row",
+  webContainer: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 10,
-    gap: 20,
+    backgroundColor: "#000",
+  },
+  webVideo: {
+    width: "100%",
+    maxWidth: 500,
+    height: "80%",
+    maxHeight: 500,
+    backgroundColor: "#333",
+  },
+  webControls: {
+    flexDirection: "row",
+    marginTop: 20,
+    gap: 10,
+    flexWrap: "wrap",
+    justifyContent: "center",
   },
   webButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
     backgroundColor: "#0B5D51",
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 5,
+    minWidth: 120,
+    alignItems: "center",
   },
   buttonText: {
     color: "#fff",
     fontSize: 16,
-    textAlign: "center",
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#000",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    backgroundColor: "#1f2937",
+    padding: 24,
+    borderRadius: 16,
+    width: "85%",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 16,
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#d1d5db",
+    marginBottom: 8,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  modalCloseButton: {
+    marginTop: 16,
+    backgroundColor: "#0B5D51",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });
 

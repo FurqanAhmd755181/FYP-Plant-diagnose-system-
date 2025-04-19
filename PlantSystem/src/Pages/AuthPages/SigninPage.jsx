@@ -23,7 +23,7 @@ const SignInScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://192.168.100.22:5000/signin', {
+      const response = await fetch('http://127.0.0.1:5000/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -32,7 +32,7 @@ const SignInScreen = ({ navigation }) => {
       const result = await response.json();
       if (result.success) {
         Alert.alert('Success', result.message);
-        // navigation.navigate('HomeScreen');
+        navigation.navigate('HomePage');
       } else {
         Alert.alert('Error', result.message);
       }
