@@ -4,7 +4,6 @@ import { PhotoContext } from "../../components/PhotoContext";
 const MyPlantsScreen = () => {
   const { photoUri } = useContext(PhotoContext);
 
-  console.log(photoUri); // Debugging to check the URI
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
