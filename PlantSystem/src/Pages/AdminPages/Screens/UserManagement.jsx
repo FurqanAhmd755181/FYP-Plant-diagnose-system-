@@ -1,48 +1,96 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-
-const users = [
-  { id: '1', name: 'John Doe', role: 'Farmer', status: 'Pending' },
-  { id: '2', name: 'Jane Smith', role: 'Researcher', status: 'Active' },
-  { id: '3', name: 'David Brown', role: 'Farmer', status: 'Active' },
-  { id: '4', name: 'Emily White', role: 'Farmer', status: 'Pending' },
-];
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 const UserManagement = () => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:5000/user/get-all");
+      const data = await response.json();
+      setUsers(data.result || []);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleDelete = (userId) => {
+    // Immediately remove from frontend
+    setUsers((prevUsers) =>
+      prevUsers.filter((user) => user.user_id !== userId)
+    );
+
+    // Optionally send delete request to backend
+    fetch(`http://127.0.0.1:5000/UserDelete?user_id=${userId}`, {
+      method: "DELETE",
+    })
+      .then((response) => response.json())
+      .then((result) => {
+        if (!result.message?.includes("deleted")) {
+          Alert.alert(
+            "Warning",
+            result.message || "Could not delete from backend"
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Backend delete failed:", error);
+        Alert.alert("Warning", "Deleted from UI, but backend failed.");
+      });
+  };
+
   const renderUser = ({ item }) => (
     <View style={styles.userCard}>
       <View style={styles.userDetailsContainer}>
-        <Ionicons
-          name={item.status === 'Active' ? 'checkmark-circle-outline' : 'time-outline'}
-          size={24}
-          color={item.status === 'Active' ? '#0B5D51' : '#FFA500'}
-        />
+        <Ionicons name="person-circle-outline" size={24} color="#0B5D51" />
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{item.name}</Text>
-          <Text style={styles.userDetails}>Role: {item.role}</Text>
-          <Text style={styles.userDetails}>Status: {item.status}</Text>
+          <Text style={styles.userName}>{item.username}</Text>
+          <Text style={styles.userDetails}>Email: {item.email}</Text>
         </View>
       </View>
       <View style={styles.actions}>
-        {item.status === 'Pending' && (
-          <TouchableOpacity style={styles.approveButton}>
-            <Text style={styles.buttonText}>Approve</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.deleteButton}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDelete(item.user_id)}
+        >
           <Text style={styles.buttonText}>Delete</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#0B5D51" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>User Management</Text>
       <FlatList
         data={users}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) =>
+          item?.user_id != null ? item.user_id.toString() : index.toString()
+        }
         renderItem={renderUser}
         contentContainerStyle={styles.list}
       />
@@ -53,33 +101,33 @@ const UserManagement = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f4f4',
+    backgroundColor: "#f4f4f4",
     padding: 16,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#0B5D51',
+    fontWeight: "bold",
+    color: "#0B5D51",
     marginBottom: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   list: {
     paddingBottom: 20,
   },
   userCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     padding: 20,
     marginBottom: 12,
     borderRadius: 15,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   userDetailsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
   },
   userInfo: {
@@ -87,33 +135,32 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   userDetails: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  approveButton: {
-    backgroundColor: '#0B5D51',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    flexDirection: "row",
+    justifyContent: "flex-end",
   },
   deleteButton: {
-    backgroundColor: '#d9534f',
+    backgroundColor: "#d9534f",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   buttonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: "bold",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 

@@ -58,15 +58,20 @@ class UserBLC:
             session.rollback()
             return {"error!" : str(e)}
         
-    @staticmethod
-    def deleted_user_by_id(args):
-        session = UserRepository.get_session()
-        try:
-            res = UserRepository.delete_user_by_id(args, session)
-            if res:
-                return {"message": "User deleted successfully", "result": res}
-            else:
-                return {"message": "User with this id not found!"}
-        except Exception as e:
-            return {"error!": str(e)}
+@staticmethod
+def deleted_user_by_id(args):
+    print("Deleting user with args:", args)
+    session = UserRepository.get_session()
+    try:
+        res = UserRepository.delete_user_by_id(args, session)
+        if res:
+            print("User deleted successfully.")
+            return {"message": "User deleted successfully", "result": res}
+        else:
+            print("User not found.")
+            return {"message": "User with this id not found!"}
+    except Exception as e:
+        print("Exception during delete:", str(e))
+        return {"error!": str(e)}
+
 

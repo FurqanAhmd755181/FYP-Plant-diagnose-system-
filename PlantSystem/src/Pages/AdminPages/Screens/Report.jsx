@@ -1,46 +1,159 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Dimensions,
+} from 'react-native';
+import { LineChart, BarChart } from 'react-native-chart-kit';
 
-const reports = [
-  { id: '1', title: 'Daily Usage', value: '245 Predictions' },
-  { id: '2', title: 'Weekly Usage', value: '1,645 Predictions' },
-  { id: '3', title: 'Monthly Usage', value: '6,245 Predictions' },
-  { id: '4', title: 'Prediction Accuracy', value: '92%' },
-  { id: '5', title: 'Most Common Disease', value: 'Leaf Blight' },
-  { id: '6', title: 'Total Users', value: '1,254 Users' },
-  { id: '7', title: 'Successful Predictions', value: '98%' },
-  { id: '8', title: 'Failed Predictions', value: '2%' },
-  { id: '9', title: 'Last Update', value: '24th Dec 2024' },
-];
+const screenWidth = Dimensions.get('window').width;
 
 const Report = () => {
-  const renderReport = ({ item }) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.value}>{item.value}</Text>
-    </View>
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total_users: 0,
+    active_users: 0,
+    model_statistics: {},
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [userRes, activeRes, statsRes] = await Promise.all([
+          fetch('http://127.0.0.1:5000/user/get_number_of_users'),
+          fetch('http://127.0.0.1:5000/api/active-users'),
+          fetch('http://127.0.0.1:5000/api/model/statistics'),
+        ]);
+
+        const userData = await userRes.json();
+        const activeData = await activeRes.json();
+        const statsData = await statsRes.json();
+
+        setStats({
+          total_users: userData.total_users || 0,
+          active_users: activeData.active_user_count || 0,
+          model_statistics: statsData || {},
+        });
+      } catch (err) {
+        console.error('Failed to fetch report data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Mock chart data
+  const accuracyLabels = Array.from({ length: 50 }, (_, i) => `E${i + 1}`);
+  const accuracyData = Array.from({ length: 50 }, (_, i) =>
+    Math.min(70 + i * 0.6 + Math.random() * 2, 99).toFixed(2)
   );
+  const dataSizeLabels = Array.from({ length: 10 }, (_, i) => `Batch ${i + 1}`);
+  const dataSize = Array.from({ length: 10 }, () => Math.floor(100 + Math.random() * 100));
+  const lastRetrained = '2025-06-01';
+  const nextRetraining = '2025-06-20';
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0B5D51" />
+        <Text>Loading Report...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Reports Overview</Text>
-      <FlatList
-        data={reports}
-        keyExtractor={(item) => item.id}
-        renderItem={renderReport}
-        contentContainerStyle={styles.list}
-        numColumns={2}
-      />
-    </View>
+    <ScrollView style={styles.container}>
+      <Text style={styles.header}>System Report</Text>
+
+      <Text style={styles.sectionTitle}>User Statistics</Text>
+      <View style={styles.row}>
+        <Card title="Total Users" value={stats.total_users} />
+        <Card title="Active Users" value={stats.active_users} />
+      </View>
+
+      <Text style={styles.sectionTitle}>Model Statistics</Text>
+      {Object.entries(stats.model_statistics).map(([key, value]) => (
+        <View style={styles.statRow} key={key}>
+          <Text style={styles.statKey}>{formatKey(key)}</Text>
+          <Text style={styles.statValue}>{String(value)}</Text>
+        </View>
+      ))}
+
+      <Text style={styles.sectionTitle}>Model Accuracy</Text>
+      <View style={styles.card}>
+        <LineChart
+          data={{
+            labels: accuracyLabels.filter((_, i) => i % 5 === 0),
+            datasets: [{ data: accuracyData.map(Number) }],
+          }}
+          width={screenWidth - 32}
+          height={250}
+          yAxisSuffix="%"
+          chartConfig={chartConfig}
+          style={styles.chartStyle}
+        />
+      </View>
+
+      <Text style={styles.sectionTitle}>Training Data Size</Text>
+      <View style={styles.card}>
+        <BarChart
+          data={{
+            labels: dataSizeLabels,
+            datasets: [{ data: dataSize }],
+          }}
+          width={screenWidth - 32}
+          height={220}
+          chartConfig={chartConfig}
+          style={styles.chartStyle}
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.title}>Last Retrained</Text>
+        <Text style={styles.value}>{lastRetrained}</Text>
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.title}>Next Retraining Scheduled</Text>
+        <Text style={styles.value}>{nextRetraining}</Text>
+      </View>
+    </ScrollView>
   );
+};
+
+const formatKey = (key) =>
+  key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+
+const Card = ({ title, value }) => (
+  <View style={styles.card}>
+    <Text style={styles.cardTitle}>{title}</Text>
+    <Text style={styles.cardValue}>{value}</Text>
+  </View>
+);
+
+const chartConfig = {
+  backgroundColor: '#f9f9f9',
+  backgroundGradientFrom: '#ffffff',
+  backgroundGradientTo: '#f4f4f4',
+  decimalPlaces: 1,
+  color: (opacity = 1) => `rgba(11, 93, 81, ${opacity})`,
+  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f4f4f9',
-    paddingHorizontal: 16,
-    paddingTop: 20,
+    backgroundColor: '#f9f9f9',
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     fontSize: 24,
@@ -49,35 +162,72 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  list: {
-    paddingBottom: 20,
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#0B5D51',
+    marginVertical: 12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
   card: {
-    flex: 1,
     backgroundColor: '#fff',
-    margin: 8,
     padding: 15,
-    borderRadius: 15,
+    marginBottom: 10,
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+  },
+  cardValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0B5D51',
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    padding: 12,
+    marginBottom: 5,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  statKey: {
+    fontWeight: 'bold',
+    color: '#444',
+  },
+  statValue: {
+    color: '#0B5D51',
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#555',
-    textAlign: 'center',
+    color: '#666',
     marginBottom: 5,
   },
   value: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#0B5D51',
-    textAlign: 'center',
+  },
+  chartStyle: {
+    marginVertical: 8,
+    borderRadius: 10,
   },
 });
 

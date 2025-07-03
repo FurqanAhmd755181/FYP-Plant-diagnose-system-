@@ -10,6 +10,8 @@ from marshmallow import ValidationError
 from flask_jwt_extended import get_jwt, jwt_required, get_jwt_identity
 from project.app.db import db
 from flask_cors import cross_origin
+from project.app.bl.Active_user_bl import Actives
+from project.app.model.ActiveUsers import ActiveUserSession
 
 bp = Blueprint("user", __name__)
 
@@ -26,31 +28,68 @@ def register_user(args):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    
-@bp.route("/user/get", methods=['GET'])
-@use_args({"id": fields.Int()}, location='query')
-def get_user(args):
-    id = args.get('id')
-    # breakpoint()
-    if id:
-        try:
-            res = UserBLC.fetch_user_by_id(args)  
-            if res:
-                schema = UserSchema()
-                result = schema.dump(res)
-                return jsonify({"message": "info Fetched", "result": result}), 201
-            else:
-                return jsonify({"message": "user not found!"}), 404
-        except Exception as e:
-            return jsonify({"error!": str(e)}), 500
-    else:
-        res = UserBLC.get_all_users()
-        if res:
+
+@bp.route("/user/get-all", methods=['GET'])
+def get_all_users():
+    try:
+        users = UserBLC.get_all_users()
+        if users:
             schema = GetAllUserSchema(many=True)
-            result = schema.dump(res)
-            return jsonify({"result" : result}), 201
+            result = schema.dump(users)
+            return jsonify({"message": "Users fetched", "result": result}), 200
         else:
-            return jsonify({"message" : "No users found!"}),404
+            return jsonify({"message": "No users found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@bp.route("/user/get_number_of_users", methods=['GET'])
+def get_user_count():
+    try:
+        users = UserBLC.get_all_users()
+        total_users = len(users) if users else 0
+        return jsonify({"message": "User count fetched", "total_users": total_users}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/user/get", methods=['POST'])
+@use_args({"id": fields.Int(required=True)}, location='json')
+def get_user_by_id(args):
+    try:
+        user = UserBLC.fetch_user_by_id(args)
+        if user:
+            schema = UserSchema()
+            result = schema.dump(user)
+            return jsonify({"message": "User fetched", "result": result}), 200
+        else:
+            return jsonify({"message": "User not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# @bp.route("/user/get", methods=['GET'])
+# @use_args({"id": fields.Int()}, location='query')
+# def get_user(args):
+#     id = args.get('id')
+#     # breakpoint()
+#     if id:
+#         try:
+#             res = UserBLC.fetch_user_by_id(args)  
+#             if res:
+#                 schema = UserSchema()
+#                 result = schema.dump(res)
+#                 return jsonify({"message": "info Fetched", "result": result}), 201
+#             else:
+#                 return jsonify({"message": "user not found!"}), 404
+#         except Exception as e:
+#             return jsonify({"error!": str(e)}), 500
+#     else:
+#         res = UserBLC.get_all_users()
+#         if res:
+#             schema = GetAllUserSchema(many=True)
+#             result = schema.dump(res)
+#             return jsonify({"result" : result}), 201
+#         else:
+#             return jsonify({"message" : "No users found!"}),404
     
         
         
@@ -65,17 +104,19 @@ def update_user(args):
         return jsonify({"message" : str(e)}),404
     
     
-@bp.route("/user", methods=['DELETE'])
+@bp.route("/UserDelete", methods=['DELETE'])
 @use_args(GetUserById(), location='query')  
 def delete_user(args):
+     
     try:
+        print("DELETE request received with args:", args)
         res = UserBLC.deleted_user_by_id(args)
-        # breakpoint()
         if "error!" in res:
             return jsonify(res), 404
         return jsonify(res), 200
     except Exception as e:
         return jsonify({"error!": str(e)}), 500
+
 
 
 @bp.route('/login', methods=['POST'])
@@ -91,10 +132,34 @@ def login(args):
         return jsonify(str(e)),422
     
 @bp.route("/logout", methods=["POST"])
-@jwt_required()  # Require JWT authentication
+@jwt_required()
 def logout():
-    jti = get_jwt()["jti"]  # Get JWT ID from token
-    db.session.add(TokenBlockList(jti=jti))  # Add to blocklist
-    db.session.commit()
-    
+    jti = get_jwt()["jti"]
+    user_id = get_jwt_identity()
+
+    session = db.session
+    active_session = session.query(ActiveUserSession).filter_by(user_id=user_id).first()
+    if active_session:
+        active_session.is_active = False
+
+    session.add(TokenBlockList(jti=jti))
+    session.commit()
+
     return jsonify({"message": "Logout successful"}), 200
+
+@bp.route("/api/active-users", methods=["GET"])
+def get_active_users():
+    active = Actives.get_active_users()
+
+    return jsonify({
+        "active_user_count": len(active),
+        "active_users": [
+            {
+                "user_id": user.user_id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role
+            }
+            for user in active
+        ]
+    }), 200

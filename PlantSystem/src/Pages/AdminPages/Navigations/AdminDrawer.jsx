@@ -7,8 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 // Import Admin Screens
 import Dashboard from '../Screens/Dashboard';
 import UserManagement from '../Screens/UserManagement';
-import DataUpload from '../Screens/Upload';
-import ModelMonitoring from '../Screens/ModelMonitoring';
+
+// import ModelMonitoring from '../Screens/ModelMonitoring';
+import MOdelM from "../../AdminPages/Screens/MOdelM"
 import Reports from '../Screens/Report';
 
 // Import a custom drawer content component if needed
@@ -53,18 +54,10 @@ const AdminDrawer = () => {
           ),
         }}
       />
-      <Drawer.Screen
-        name="Data Upload"
-        component={DataUpload}
-        options={{
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="cloud-upload-outline" size={size} color={color} />
-          ),
-        }}
-      />
+      
       <Drawer.Screen
         name="Model Monitoring"
-        component={ModelMonitoring}
+        component={MOdelM}
         options={{
           drawerIcon: ({ color, size }) => (
             <Ionicons name="analytics-outline" size={size} color={color} />
